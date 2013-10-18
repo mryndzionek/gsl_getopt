@@ -1,7 +1,7 @@
 Introduction
 ------------
 
-After reading [GSL](https://github.com/imatix/gsl) I decided to try learning the key concepts and grasp the idea behind this approach to code generation. This is the result of my research: *getopt C command-line parser generator*.
+After reading [GSL](https://github.com/imatix/gsl) I decided to try learning the key concepts and grasp the idea behind this approach to code generation. This is the result of my research: **getopt C command-line parser generator**.
 You just simply write an XML specification of the parser and the GSL script generates .c and .h file implementing the getopt based parser code. In case of parsers where the code connected implementing one option is scattered throughout the code base this approach is a clear win. You end up with short specification and a lot of code generated. The example specification is very simple - about 40 lines of code - and the generated code has about 500 lines of code.
 
 Usage
@@ -13,7 +13,7 @@ cd model
 ./generate
 ```
 
-The C source and header files will be created in src\ and include\ directories.
+The C source and header files will be created in *src\* and *include\* directories.
 To add your own parser specification create an XML file in the model directory and modify the generate script. Look at the file *model/example_parser.xml* for example parser specification.
 
 The GSL tool
