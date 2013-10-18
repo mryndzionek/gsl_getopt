@@ -1,3 +1,6 @@
+GSL C Getopt parser generator
+=============================
+
 Introduction
 ------------
 
@@ -29,3 +32,9 @@ TODO
 - add support for 'long only' options
 - add support for the main program arguments
 - the regexand enum types are required - add 'default' option
+
+Contact
+-------
+If you have questions, contact Maiusz Ryndzionek at:
+
+<mryndzionek@gmail.com>
