@@ -1,0 +1,545 @@
+.#  parser_c.gsl
+.#
+.#  Generates a parser for commandline options
+.#
+.#
+.# Helper functions
+.function resolve_includes ()
+    for parser.include
+        if defined (include.filename)
+            my.include_file = parser.load_file (filename)
+            if defined (my.include_file)
+                move my.include_file after include
+            else
+                echo "E: error loading include file: $(filename): $(xml.error?)"
+            endif
+        else
+            echo "E: required attribute 'filename' not defined"
+        endif
+    endfor
+.endfunction
+.resolve_includes ()
+.echo "Generating ../include/$(parser.name).h..."
+.output "../include/$(parser.name).h"
+/*  =========================================================================
+    $(parser.name) - $(parser.title)
+    
+    Generated parser for $(parser.name)
+    -------------------------------------------------------------------------
+    $(string.trim (parser->license.):block                                   )
+    =========================================================================
+*/
+
+#ifndef __$(PARSER.NAME)_H_INCLUDED__
+#define __$(PARSER.NAME)_H_INCLUDED__
+
+/*  These are the $(parser.name) parameters
+.for parameter
+.   if string.length (name) > 1
+.       abort "F: name length must be 1 - '$(name)'"
+.   endif
+.   for parser.parameter as darg where parameter <> darg
+.       if name = parameter.name
+.           abort "F: duplicate name '$(name)'"
+.       elsif defined (parameter.lname) & defined (darg.lname) & darg.lname = parameter.lname
+.           abort "F: duplicate lname '$(parameter.lname)'"
+.       endif
+.   endfor
+.if defined (lname)
+        -$(name) | --$(lname) - $(string.trim (.?''):left) - type $(type)
+.   else
+        -$(name) - $(string.trim (.?''):left) - type $(type)
+.   endif
+.parameter.name = "$(parameter.name:c)"
+.endfor
+*/
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+.for parameter
+.   for value
+.       if first ()
+typedef enum {
+.       endif
+.       ve = string.trim (.?'')
+        $(NAME)_$(VE:c)\
+.       if first ()
+ = 0,
+.       elsif last ()
+
+.       else
+,
+.       endif         
+.       if last ()
+} $(Name)_VALUE;
+
+.       endif
+.   endfor
+.endfor
+
+//  Opaque class structure
+typedef struct _$(parser.name)_t $(parser.name)_t;
+
+//  @interface
+//  Parse $(parser.name) from string
+$(parser.name)_t *
+    $(parser.name)_parse (int argc, char **argv);
+
+void
+    $(parser.name)_destroy ($(parser.name)_t **self_p);
+
+void
+    $(parser.name)_dump ($(parser.name)_t *self);
+
+.for parser.parameter
+.   if type = "string"
+char *
+    $(parser.name)_$(name) ($(parser.name)_t *self);
+.       if defined (lname)
+
+char *
+    $(parser.name)_$(lname) ($(parser.name)_t *self);
+.       endif
+.   elsif type = "bool" | type = "enum"
+int 
+    $(parser.name)_$(name) ($(parser.name)_t *self);
+.       if defined (lname)
+int 
+    $(parser.name)_$(lname) ($(parser.name)_t *self);
+.       endif
+.   else
+.       abort "F: unknown type '$(type)' for parameter '$(name)'"
+.   endif
+
+.endfor
+
+#ifdef __cplusplus
+}
+#endif
+.echo "Generating ../src/$(parser.name).c..."
+.output "../src/$(parser.name).c"
+/*  =========================================================================
+    $(parser.name) - $(parser.title)
+
+    Generated parser implementation for $(parser.name)
+    -------------------------------------------------------------------------
+    $(string.trim (parser->license.):block                                   )
+    =========================================================================
+*/
+
+/*
+@header
+    $(parser.name) - $(parser.title)
+@discuss
+@end
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <getopt.h>
+#include <string.h>
+#include <errno.h>
+#include <assert.h>
+.for parameter
+.   for regex where item () = 1
+#include <regex.h>
+.   endfor
+.endfor
+
+#include "$(parser.name).h"
+
+#ifdef NDEBUG
+#define debug(M, ...)
+#else
+#define debug(M, ...) fprintf(stderr, "DEBUG %s:%d: " M "\\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#endif
+
+#define clean_errno() (errno == 0 ? "None" : strerror(errno))
+
+#define log_err(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
+
+#define log_warn(M, ...) fprintf(stderr, "[WARN] (%s:%d: errno: %s) " M "\\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
+
+#define log_info(M, ...) fprintf(stderr, "[INFO] (%s:%d) " M "\\n", __FILE__, __LINE__, ##__VA_ARGS__)
+
+#define check(A, M, ...) if(!(A)) { log_err(M, ##__VA_ARGS__); errno=0; goto error; }
+
+#define sentinel(M, ...)  { log_err(M, ##__VA_ARGS__); errno=0; goto error; }
+
+#define check_mem(A) check((A), "Out of memory.")
+
+#define check_debug(A, M, ...) if(!(A)) { debug(M, ##__VA_ARGS__); errno=0; goto error; }
+
+.for parameter where type = "string"
+.   for default 
+static char $(name)_dflt[] = "$(string.trim (.?''):left)";
+.   endfor
+.endfor
+
+.for parameter where type = "bool" & defined (lname)
+static int $(name)_flag;
+.endfor
+
+const static char help_msg[] =
+                    "$(parser.name) - $(parser.title)\\n"
+.for parameter
+.   if defined (lname)
+                    "   -$(name) | --$(lname) - $(string.trim (.?''):left)\
+.   else
+                    "   -$(name) - $(string.trim (.?''):left)\
+.   endif
+ - type = $(type)\
+.   if type = "string"
+.       for regex where item () = 1
+\\n"
+\t\t\t\t\t" \t\t- regex = $(string.trim (.?''):left)\
+.       endfor
+.   elsif type = "enum"
+\\n"
+\t\t\t\t\t" \t\t- one of:\
+.       for value
+.       ve = string.trim (.?'')
+$(ve:c)\
+.           if !last ()
+|\
+.           endif
+.       endfor
+.   endif
+\\n"\
+.   if last ()
+;
+.   else
+
+.   endif
+.endfor
+
+.for parameter where type ="enum"
+static char *$(name)_to_str[] = {
+.   for value
+.       ve = string.trim (.?'')
+        "$(ve:c)"\
+.       if last()
+
+.       else
+,
+.       endif        
+.   endfor
+};
+
+static int $(name)_to_enum(char *str)
+{
+.   for value
+.       ve = string.trim (.?'')
+.       if first()
+    if(\
+.       else
+    else if(\
+.       endif           
+strncmp("$(ve:c)", str, $(string.length(ve)+1)) == 0)
+        return $(NAME)_$(VE:c);    
+.   endfor
+    else
+        return -1;
+}
+.endfor
+
+//  Structure of our class
+
+struct _$(parser.name)_t {
+.for parser.parameter
+.   if type = "string"
+    char *$(name);
+.   elsif type = "bool" | type = "enum"
+    int $(name);
+.   endif
+.endfor
+    char **args;
+    int args_len;
+};
+
+.for parameter
+.   for regex where item () = 1
+//  --------------------------------------------------------------------------
+//  Verify that the string argument matches the regex
+static int verify_regex(char *str, char *regex)
+{
+    int rc, ret = 0;
+    regex_t *_regex;
+
+    _regex = calloc(1, sizeof(regex_t));
+    rc = regcomp( _regex, regex, REG_EXTENDED | REG_NOSUB );
+    if(rc == 0)
+    {
+        rc = regexec( _regex, str, 0 , 0 , 0 );
+        if(rc != 0)
+            ret = -1;
+
+        regfree(_regex);
+
+    } else 
+        ret = -1;
+    
+    free(_regex);
+
+    return ret;
+}
+.   endfor
+.endfor
+
+//  --------------------------------------------------------------------------
+//  Parse a $(parser.name) from string. Returns new object or
+//  NULL if error.
+
+$(parser.name)_t *
+$(parser.name)_parse (int argc, char **argv)
+{
+    $(parser.name)_t *self = ($(parser.name)_t *) malloc (sizeof ($(parser.name)_t));
+.for parameter
+.   if type = "bool"
+    self->$(name) = 0;
+.   elsif type = "enum"
+    self->$(name) = -1;
+.   elsif type = "string"
+    self->$(name) = NULL;
+.   endif
+.endfor
+    self->args_len = -1;
+
+    int c, rc;
+
+    while(1)
+    {
+        static struct option long_options[] =
+        {
+.for parameter
+.   if defined (lname)
+            {"$(lname)", \
+.       if type = "bool"
+\tno_argument, &$(name)_flag, 1},
+.       else
+\trequired_argument, 0, '$(name)'},
+.       endif 
+.   endif
+.endfor
+            {0, 0, 0, 0}
+        };
+
+        int option_index = 0;
+        c = getopt_long (argc, argv, "\
+.for parameter by name
+.   if type = "string" | type = "enum"
+$(name):\
+.   elsif type = "bool"
+.        if !defined (lname)
+$(name)\   
+.       endif
+.   endif
+.endfor
+",
+                         long_options, &option_index);
+        /* detect the end of the options */
+        if (c == -1)
+            break;
+
+        switch (c)
+        {
+            case 0:
+            /* If this option set a flag, do nothing else now. */
+            if (long_options[option_index].flag != 0)
+                break;
+             
+.for parameter where defined (lname) & type <> "bool"
+.   if first()
+            if(strncmp("$(lname)", long_options[option_index].name, $(string.length(lname)+1)) == 0)
+.   else
+            else if(strncmp("$(lname)", long_options[option_index].name, $(string.length(lname)+1)) == 0)
+.   endif           
+.   if type = "string"
+                self->$(name) = optarg;
+.   elsif type = "enum"                 
+                self->$(name) = $(name)_to_enum(optarg);
+.   endif
+.endfor                  
+            break;
+
+.for parameter by name
+.   if type = "string" | type = "enum" | (type = "bool" & !defined (lname))
+            case '$(name)':
+.       if type = "string"
+                self->$(name) = optarg;
+.       elsif type = "bool"
+                self->$(name) = 1;
+.       elsif type = "enum"
+                self->$(name) = $(name)_to_enum(optarg);
+.       endif
+            break;
+
+.   endif
+.endfor
+            case '?':
+            /* getopt_long already printed an error message. */
+            goto error;
+            break;
+            
+            default:
+                sentinel ("Switched to default value");
+            break;           
+        }
+    }
+
+.for parameter where type = "bool" & defined (lname)
+    self->$(name) = $(name)_flag;
+.endfor
+.for parameter where type = "string"
+.   for default
+    if(self->$(name) == NULL) 
+        self->$(name) = $(name)_dflt;
+.   endfor
+.endfor
+
+.for parameter where type = "string"
+.   for regex where item () = 1
+    if(self->$(name) != NULL)
+    {
+        rc = verify_regex(self->$(name), "$(string.trim (.?''):left)");
+        if(rc != 0)
+        {
+            fprintf(stderr, "The parameter -$(name) \
+.       if defined (lname)
+(--$(lname)) \
+.       endif 
+does not match regex: $(string.trim (.?''):left)\\n");
+            goto error;
+        }
+    } else {
+        fprintf(stderr, "The parameter -$(name) \
+.       if defined (lname)
+(--$(lname)) \
+.       endif
+is not set but must match regex: $(string.trim (.?''):left)\\n");
+        goto error;
+    }
+.   endfor
+.endfor
+
+.for parameter where type = "enum"
+    if(self->$(name) == -1)
+    {
+        fprintf(stderr, "Wrong enum value for parameter: $(name)\\n");
+        goto error;
+    }
+.endfor
+
+    if(optind < argc)
+    {
+        self->args_len = argc - optind;
+        self->args = &argv[optind];
+    }
+
+    return self;
+
+    error:
+    opts_destroy(&self);
+    fprintf(stderr, "Usage: \\n%s", help_msg);
+    return NULL;
+}
+
+//  --------------------------------------------------------------------------
+//  Destroy the $(parser.name)
+
+void
+$(parser.name)_destroy ($(parser.name)_t **self_p)
+{
+    assert (self_p);
+    if (*self_p) {
+        $(parser.name)_t *self = *self_p;
+
+        //  Free object itself
+        free (self);
+        *self_p = NULL;
+    }
+}
+
+void
+$(parser.name)_dump ($(parser.name)_t *self)
+{
+    int i;
+    assert(self);
+.for parameter
+.   if type = "string"
+    printf("    -$(name)\
+.       if defined (lname)
+ (--$(lname)) \
+.       else
+ \
+.       endif
+= %s\\n", self->$(name)==NULL ? "not set" : self->$(name));    
+.   elsif type = "bool"
+    if(self->$(name))
+        printf("    -$(name)\
+.       if defined (lname)
+ (--$(lname)) \
+.       else
+ \
+.       endif
+= %d\\n", self->$(name));          
+.   elsif type = "enum"
+    printf("    -$(name)\
+.       if defined (lname)
+ (--$(lname)) \
+.       else
+ \
+.       endif
+= %s\\n", $(name)_to_str[self->$(name)]);          
+.   endif   
+.endfor
+    
+    printf("\\n");
+    if(self->args_len > 0)
+        for(i = 0; i < self->args_len; i++)
+            printf("    arg_%d = %s\\n", i+1, self->args[i]); 
+}
+
+.for parser.parameter
+//  --------------------------------------------------------------------------
+.   if type = "string"
+//  Get the $(parser.name) $(name) parameter
+
+char *
+$(parser.name)_$(name) ($(parser.name)_t *self)
+.       if defined (lname)
+{
+    return self->$(name);
+}
+
+//  --------------------------------------------------------------------------
+//  Get the $(parser.name) $(lname) parameter
+
+char *
+$(parser.name)_$(lname) ($(parser.name)_t *self)
+.       endif
+.   elsif type = "bool" | type = "enum"
+//  Get the $(parser.name) $(name) flag
+
+int 
+$(parser.name)_$(name) ($(parser.name)_t *self)
+.       if defined (lname)
+{
+    return self->$(name);
+}
+
+//  --------------------------------------------------------------------------
+//  Get the $(parser.name) $(lname) flag
+
+int 
+$(parser.name)_$(lname) ($(parser.name)_t *self)
+.       endif
+.   endif
+{
+    return self->$(name);
+}
+
+.endfor

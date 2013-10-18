@@ -1,0 +1,9 @@
+#!/bin/sh
+
+export PATH=../scripts:$PATH
+if ! [ -e "../bin" ];then
+	mkdir ../bin
+	mkdir ../include
+fi
+gsl -q -script:parser_c example_parser.xml
+make -C ..

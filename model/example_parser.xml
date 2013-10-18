@@ -1,0 +1,43 @@
+<parser name = "opts" title = "parse some commandline parameters">
+This is an example of commandline options parser
+
+<include filename = "license.xml" />
+
+<parameter name="c" lname="clone" type="bool">
+A flag type long option example
+</parameter>
+
+<parameter name="f" type="bool">
+A flag type option example
+</parameter>
+
+<parameter name="m" type="string">
+A short option example
+</parameter>
+
+<parameter name="a" lname="append" type="string">
+A short and long option example
+</parameter>
+
+<parameter name="h" lname="help" type="string">
+A short and long option example
+</parameter>
+
+<parameter name="d" lname="default" type="string">
+<default>default value</default>
+A short and long option example with default value
+</parameter>
+
+<parameter name="r" lname="regex" type="string">
+<regex>^read:(hold|write):([0-9]+)(-([0-9]+))*$</regex>
+A short and long option example
+</parameter>
+
+<parameter name="e" lname="enum" type="enum">
+<value>value 1</value>
+<value>value 2</value>
+<value>value 3</value>
+A short and long option enum parameter example
+</parameter>
+
+</parser>
