@@ -31,7 +31,7 @@ TODO
 
 - add support for 'long only' options
 - add support for the main program arguments
-- the regexand enum types are required - add 'default' option
+- the regex and enum types are required - add 'default' option
 
 Contact
 -------
