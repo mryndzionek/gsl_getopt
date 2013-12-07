@@ -18,8 +18,8 @@ cd model
 ```
 
 Note that you need to have the [GSL](https://github.com/imatix/gsl) tool installed.
-The C source and header files will be created in *src\* and *include\* directories.
-To add your own parser specification create an XML file in the model directory and modify the generate script. Look at the file *model/example_parser.xml* for example parser specification.
+The C source and header files will be created in `src/` and `include/` directories.
+To add your own parser specification create an XML file in the model directory and modify the generate script. Look at the file `model/example_parser.xml` for example parser specification.
 
 The GSL tool
 ------------
