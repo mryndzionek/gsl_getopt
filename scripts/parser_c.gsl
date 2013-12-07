@@ -19,6 +19,24 @@
     endfor
 .endfunction
 .resolve_includes ()
+.
+.for parameter
+.   for regex where item () = 1
+.   define hasregex = 1
+.   endfor
+.endfor
+.
+.if defined (hasregex)
+.   for parameter where type = "string" as prm
+.       for regex where item () = 1 as rgx
+.           for prm.default where item() = 1 as dflt
+.               if ! regexp.match (rgx, dflt)
+.                   abort "The default value for $(prm.name) must match regexp: $(rgx)"
+.               endif
+.           endfor
+.       endfor
+.   endfor
+.endif
 .echo "Generating ../include/$(parser.name).h..."
 .output "../include/$(parser.name).h"
 /*  =========================================================================
@@ -35,9 +53,6 @@
 
 /*  These are the $(parser.name) parameters
 .for parameter
-.   if string.length (name) > 1
-.       abort "F: name length must be 1 - '$(name)'"
-.   endif
 .   for parser.parameter as darg where parameter <> darg
 .       if name = parameter.name
 .           abort "F: duplicate name '$(name)'"
@@ -63,8 +78,7 @@ extern "C" {
 .       if first ()
 typedef enum {
 .       endif
-.       ve = string.trim (.?'')
-        $(NAME)_$(VE:c)\
+        $(NAME)_$(string.trim (.?''):upper,c)\
 .       if first ()
  = 0,
 .       elsif last ()
@@ -144,11 +158,9 @@ int
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
-.for parameter
-.   for regex where item () = 1
+.if defined (hasregex)
 #include <regex.h>
-.   endfor
-.endfor
+.endif
 
 #include "$(parser.name).h"
 
@@ -160,27 +172,35 @@ int
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 
-#define log_err(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
-
-#define log_warn(M, ...) fprintf(stderr, "[WARN] (%s:%d: errno: %s) " M "\\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
-
-#define log_info(M, ...) fprintf(stderr, "[INFO] (%s:%d) " M "\\n", __FILE__, __LINE__, ##__VA_ARGS__)
-
-#define check(A, M, ...) if(!(A)) { log_err(M, ##__VA_ARGS__); errno=0; goto error; }
+#define log_err(M, ...) fprintf(stderr, "[ERROR] " M "\\n", ##__VA_ARGS__)
 
 #define sentinel(M, ...)  { log_err(M, ##__VA_ARGS__); errno=0; goto error; }
 
-#define check_mem(A) check((A), "Out of memory.")
+#define __crash()    (*(char *)NULL)
 
-#define check_debug(A, M, ...) if(!(A)) { debug(M, ##__VA_ARGS__); errno=0; goto error; }
+#define $(parser.name)_assert( _cond, M, ...) \
+do { if(!(_cond)) { __crash() = log_err(M, ##__VA_ARGS__); } } while( 0 )
 
+.macro output_opt_struct (nm, lnm, els)
+.   if first() & ! defined (my.els)
+            if(strncmp("$(my.lnm)", long_options[option_index].name, $(string.length(my.lnm)+1)) == 0)
+.   else
+            else if(strncmp("$(my.lnm)", long_options[option_index].name, $(string.length(my.lnm)+1)) == 0)
+.   endif           
+.   if type = "string"
+                self->$(my.nm) = optarg;
+.   elsif type = "enum"                 
+                self->$(my.nm) = $(my.nm)_to_enum(optarg);
+.   endif
+.endmacro
+.
 .for parameter where type = "string"
 .   for default 
-static char $(name)_dflt[] = "$(string.trim (.?''):left)";
+static char *$(name)_dflt = "$(string.trim (.?''):left)";
 .   endfor
 .endfor
 
-.for parameter where type = "bool" & defined (lname)
+.for parameter where type = "bool" & (defined (lname) | string.length (name) > 1)
 static int $(name)_flag;
 .endfor
 
@@ -190,26 +210,37 @@ const static char help_msg[] =
 .   if defined (lname)
                     "   -$(name) | --$(lname) - $(string.trim (.?''):left)\
 .   else
+.       if string.length (name) > 1
+                    "   --$(name) - $(string.trim (.?''):left)\
+.       else
                     "   -$(name) - $(string.trim (.?''):left)\
+.       endif
 .   endif
  - type = $(type)\
 .   if type = "string"
 .       for regex where item () = 1
 \\n"
-\t\t\t\t\t" \t\t- regex = $(string.trim (.?''):left)\
+\t\t\t\t\t" \t\t- regex = '$(string.trim (.?''):left)'\
+.       endfor
+.       for default where item () = 1
+\\n"
+\t\t\t\t\t" \t\t- default = '$(string.trim (.?''):left)'\
 .       endfor
 .   elsif type = "enum"
 \\n"
 \t\t\t\t\t" \t\t- one of:\
 .       for value
-.       ve = string.trim (.?'')
-$(ve:c)\
+$(string.trim (.?''):c)\
 .           if !last ()
 |\
 .           endif
 .       endfor
+.       for default where item () = 1
+\\n"
+\t\t\t\t\t" \t\t- default = '$(string.trim (.?''):left,c)'\
+.       endfor
 .   endif
-\\n"\
+\\n\\n"\
 .   if last ()
 ;
 .   else
@@ -220,8 +251,7 @@ $(ve:c)\
 .for parameter where type ="enum"
 static char *$(name)_to_str[] = {
 .   for value
-.       ve = string.trim (.?'')
-        "$(ve:c)"\
+        "$(string.trim (.?''):c)"\
 .       if last()
 
 .       else
@@ -243,8 +273,9 @@ strncmp("$(ve:c)", str, $(string.length(ve)+1)) == 0)
         return $(NAME)_$(VE:c);    
 .   endfor
     else
-        return -1;
+        return -2;
 }
+
 .endfor
 
 //  Structure of our class
@@ -261,8 +292,7 @@ struct _$(parser.name)_t {
     int args_len;
 };
 
-.for parameter
-.   for regex where item () = 1
+.if defined (hasregex)
 //  --------------------------------------------------------------------------
 //  Verify that the string argument matches the regex
 static int verify_regex(char *str, char *regex)
@@ -287,8 +317,7 @@ static int verify_regex(char *str, char *regex)
 
     return ret;
 }
-.   endfor
-.endfor
+.endif
 
 //  --------------------------------------------------------------------------
 //  Parse a $(parser.name) from string. Returns new object or
@@ -298,6 +327,8 @@ $(parser.name)_t *
 $(parser.name)_parse (int argc, char **argv)
 {
     $(parser.name)_t *self = ($(parser.name)_t *) malloc (sizeof ($(parser.name)_t));
+    $(parser.name)_assert(self, "Out of memory !!!");
+
 .for parameter
 .   if type = "bool"
     self->$(name) = 0;
@@ -315,15 +346,18 @@ $(parser.name)_parse (int argc, char **argv)
     {
         static struct option long_options[] =
         {
-.for parameter
-.   if defined (lname)
-            {"$(lname)", \
-.       if type = "bool"
-\tno_argument, &$(name)_flag, 1},
-.       else
-\trequired_argument, 0, '$(name)'},
-.       endif 
+.for parameter where type = "bool"
+.   if string.length(name) > 1
+            {"$(name)", \tno_argument, &$(name)_flag, 1},
+.   elsif defined (lname)            
+            {"$(lname)", \tno_argument, &$(name)_flag, 1},
 .   endif
+.endfor
+.for parameter where type <> "bool" & defined (lname) & string.length (name) = 1
+            {"$(lname)", \trequired_argument, 0, '$(name)'},
+.endfor
+.for parameter where type <> "bool" & string.length (name) > 1
+            {"$(name)", \trequired_argument, 0, 0},
 .endfor
             {0, 0, 0, 0}
         };
@@ -331,11 +365,13 @@ $(parser.name)_parse (int argc, char **argv)
         int option_index = 0;
         c = getopt_long (argc, argv, "\
 .for parameter by name
-.   if type = "string" | type = "enum"
+.   if string.length (name) = 1
+.       if type = "string" | type = "enum"
 $(name):\
-.   elsif type = "bool"
-.        if !defined (lname)
+.       elsif type = "bool"
+.           if !defined (lname)
 $(name)\   
+.           endif
 .       endif
 .   endif
 .endfor
@@ -352,32 +388,28 @@ $(name)\
             if (long_options[option_index].flag != 0)
                 break;
              
-.for parameter where defined (lname) & type <> "bool"
-.   if first()
-            if(strncmp("$(lname)", long_options[option_index].name, $(string.length(lname)+1)) == 0)
-.   else
-            else if(strncmp("$(lname)", long_options[option_index].name, $(string.length(lname)+1)) == 0)
-.   endif           
-.   if type = "string"
-                self->$(name) = optarg;
-.   elsif type = "enum"                 
-                self->$(name) = $(name)_to_enum(optarg);
-.   endif
+.for parameter where string.length (name) = 1 & defined (lname) & type <> "bool"
+.   output_opt_struct (name, lname)
+.endfor                  
+.for parameter where string.length (name) > 1 & type <> "bool"
+.   output_opt_struct (name, name, 1)
 .endfor                  
             break;
 
 .for parameter by name
-.   if type = "string" | type = "enum" | (type = "bool" & !defined (lname))
+.   if string.length (name) = 1
+.       if type = "string" | type = "enum" | (type = "bool" & !defined (lname))
             case '$(name)':
-.       if type = "string"
+.           if type = "string"
                 self->$(name) = optarg;
-.       elsif type = "bool"
+.           elsif type = "bool"
                 self->$(name) = 1;
-.       elsif type = "enum"
+.           elsif type = "enum"
                 self->$(name) = $(name)_to_enum(optarg);
-.       endif
+.           endif
             break;
 
+.       endif
 .   endif
 .endfor
             case '?':
@@ -391,14 +423,32 @@ $(name)\
         }
     }
 
-.for parameter where type = "bool" & defined (lname)
+.for parameter where type = "bool" & (defined (lname) | string.length (name) > 1)
     self->$(name) = $(name)_flag;
 .endfor
 .for parameter where type = "string"
-.   for default
+.   for default where item () = 1
     if(self->$(name) == NULL) 
         self->$(name) = $(name)_dflt;
 .   endfor
+.endfor
+.for parameter where type = "enum"
+.   for default where item () = 1
+    // enum value not set - fallback to default value
+    if(self->$(name) == -1) 
+        self->$(name) = $(NAME)_$(string.trim (.?''):upper,c);
+.   endfor
+    if(self->$(name) == -2)
+        sentinel("The parameter \
+.if string.length (name) > 1
+--$(name) \
+.else
+-$(name) \
+.endif        
+.if defined (lname)
+(--$(lname)) \
+.endif
+does not match any of the allowed enum values");        
 .endfor
 
 .for parameter where type = "string"
@@ -408,20 +458,18 @@ $(name)\
         rc = verify_regex(self->$(name), "$(string.trim (.?''):left)");
         if(rc != 0)
         {
-            fprintf(stderr, "The parameter -$(name) \
+            sentinel("The parameter -$(name) \
 .       if defined (lname)
 (--$(lname)) \
 .       endif 
-does not match regex: $(string.trim (.?''):left)\\n");
-            goto error;
+does not match regex: $(string.trim (.?''):left)");
         }
     } else {
-        fprintf(stderr, "The parameter -$(name) \
+        sentinel("The parameter -$(name) \
 .       if defined (lname)
 (--$(lname)) \
 .       endif
-is not set but must match regex: $(string.trim (.?''):left)\\n");
-        goto error;
+is not set but must match regex: $(string.trim (.?''):left)");
     }
 .   endfor
 .endfor
@@ -429,8 +477,7 @@ is not set but must match regex: $(string.trim (.?''):left)\\n");
 .for parameter where type = "enum"
     if(self->$(name) == -1)
     {
-        fprintf(stderr, "Wrong enum value for parameter: $(name)\\n");
-        goto error;
+        sentinel("Wrong enum value for parameter: $(name)");
     }
 .endfor
 
@@ -471,7 +518,11 @@ $(parser.name)_dump ($(parser.name)_t *self)
     assert(self);
 .for parameter
 .   if type = "string"
+.       if string.length (name) > 1
+    printf("    --$(name)\
+.       else
     printf("    -$(name)\
+.       endif
 .       if defined (lname)
  (--$(lname)) \
 .       else
@@ -480,7 +531,11 @@ $(parser.name)_dump ($(parser.name)_t *self)
 = %s\\n", self->$(name)==NULL ? "not set" : self->$(name));    
 .   elsif type = "bool"
     if(self->$(name))
-        printf("    -$(name)\
+.       if string.length (name) > 1
+    printf("    --$(name)\
+.       else
+    printf("    -$(name)\
+.       endif
 .       if defined (lname)
  (--$(lname)) \
 .       else
@@ -488,7 +543,11 @@ $(parser.name)_dump ($(parser.name)_t *self)
 .       endif
 = %d\\n", self->$(name));          
 .   elsif type = "enum"
+.       if string.length (name) > 1
+    printf("    --$(name)\
+.       else
     printf("    -$(name)\
+.       endif
 .       if defined (lname)
  (--$(lname)) \
 .       else

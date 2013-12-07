@@ -7,6 +7,10 @@ This is an example of commandline options parser
 A flag type long option example
 </parameter>
 
+<parameter name="long_bool" type="bool">
+A flag type long only option example
+</parameter>
+
 <parameter name="f" type="bool">
 A flag type option example
 </parameter>
@@ -19,6 +23,10 @@ A short option example
 A short and long option example
 </parameter>
 
+<parameter name="long_str" type="string">
+A string type long only option example
+</parameter>
+
 <parameter name="h" lname="help" type="string">
 A short and long option example
 </parameter>
@@ -28,9 +36,20 @@ A short and long option example
 A short and long option example with default value
 </parameter>
 
+<parameter name="long_str_dflt" type="string">
+<default>default long value</default>
+A string type long only option example
+</parameter>
+
 <parameter name="r" lname="regex" type="string">
 <regex>^read:(hold|write):([0-9]+)(-([0-9]+))*$</regex>
-A short and long option example
+A short and long regex option example
+</parameter>
+
+<parameter name="s" lname="regext" type="string">
+<regex>^read:(hold|write):([0-9]+)(-([0-9]+))*$</regex>
+<default>read:hold:2-3</default>
+A short and long regex option example with default value 
 </parameter>
 
 <parameter name="e" lname="enum" type="enum">
@@ -38,6 +57,22 @@ A short and long option example
 <value>value 2</value>
 <value>value 3</value>
 A short and long option enum parameter example
+</parameter>
+
+<parameter name="g" lname="enumt" type="enum">
+<value>value 3</value>
+<value>value 4</value>
+<value>value 5</value>
+<default>value 3</default>
+A short and long option enum parameter example
+</parameter>
+
+<parameter name="enum_long" type="enum">
+<value>value 6</value>
+<value>value 7</value>
+<value>value 8</value>
+<default>value 6</default>
+A long only option enum parameter example
 </parameter>
 
 </parser>
