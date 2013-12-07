@@ -181,6 +181,9 @@ int
 #define $(parser.name)_assert( _cond, M, ...) \
 do { if(!(_cond)) { __crash() = log_err(M, ##__VA_ARGS__); } } while( 0 )
 
+#define _NOT_SET -1
+#define _WRONG_VALUE -2
+
 .macro output_opt_struct (nm, lnm, els)
 .   if first() & ! defined (my.els)
             if(strncmp("$(my.lnm)", long_options[option_index].name, $(string.length(my.lnm)+1)) == 0)
@@ -273,7 +276,7 @@ strncmp("$(ve:c)", str, $(string.length(ve)+1)) == 0)
         return $(NAME)_$(VE:c);    
 .   endfor
     else
-        return -2;
+        return _WRONG_VALUE;
 }
 
 .endfor
@@ -333,7 +336,7 @@ $(parser.name)_parse (int argc, char **argv)
 .   if type = "bool"
     self->$(name) = 0;
 .   elsif type = "enum"
-    self->$(name) = -1;
+    self->$(name) = _NOT_SET;
 .   elsif type = "string"
     self->$(name) = NULL;
 .   endif
@@ -435,10 +438,10 @@ $(name)\
 .for parameter where type = "enum"
 .   for default where item () = 1
     // enum value not set - fallback to default value
-    if(self->$(name) == -1) 
+    if(self->$(name) == _NOT_SET) 
         self->$(name) = $(NAME)_$(string.trim (.?''):upper,c);
 .   endfor
-    if(self->$(name) == -2)
+    if(self->$(name) == _WRONG_VALUE)
         sentinel("The parameter \
 .if string.length (name) > 1
 --$(name) \
