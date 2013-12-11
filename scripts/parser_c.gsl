@@ -197,9 +197,24 @@ do { if(!(_cond)) { __crash() = log_err(M, ##__VA_ARGS__); } } while( 0 )
 .   endif
 .endmacro
 .
+.macro output_parameter_names
+.if string.length (name) > 1
+--$(name) \
+.else
+-$(name) \
+.endif        
+.if defined (lname)
+(--$(lname)) \
+.endif
+.endmacro
+.
 .for parameter where type = "string"
-.   for default 
+.   for default
+.       if defined (parameter->regex)
 static char *$(name)_dflt = "$(string.trim (.?''):left)";
+.       else
+static char *$(name)_dflt = "$(string.trim (.?''):left,c)";
+.       endif
 .   endfor
 .endfor
 
@@ -437,20 +452,13 @@ $(name)\
 .endfor
 .for parameter where type = "enum"
 .   for default where item () = 1
-    // enum value not set - fallback to default value
+    // enum value $(name) not set - fallback to default value
     if(self->$(name) == _NOT_SET) 
         self->$(name) = $(NAME)_$(string.trim (.?''):upper,c);
 .   endfor
     if(self->$(name) == _WRONG_VALUE)
         sentinel("The parameter \
-.if string.length (name) > 1
---$(name) \
-.else
--$(name) \
-.endif        
-.if defined (lname)
-(--$(lname)) \
-.endif
+.output_parameter_names ()
 does not match any of the allowed enum values");        
 .endfor
 
@@ -461,18 +469,14 @@ does not match any of the allowed enum values");
         rc = verify_regex(self->$(name), "$(string.trim (.?''):left)");
         if(rc != 0)
         {
-            sentinel("The parameter -$(name) \
-.       if defined (lname)
-(--$(lname)) \
-.       endif 
+            sentinel("The parameter \
+.output_parameter_names ()
 does not match regex: $(string.trim (.?''):left)");
         }
     } else {
-        sentinel("The parameter -$(name) \
-.       if defined (lname)
-(--$(lname)) \
-.       endif
-is not set but must match regex: $(string.trim (.?''):left)");
+        sentinel("The parameter \
+.output_parameter_names ()
+ is not set but must match regex: $(string.trim (.?''):left)");
     }
 .   endfor
 .endfor
@@ -480,7 +484,9 @@ is not set but must match regex: $(string.trim (.?''):left)");
 .for parameter where type = "enum"
     if(self->$(name) == -1)
     {
-        sentinel("Wrong enum value for parameter: $(name)");
+        sentinel("Wrong enum value for parameter: \
+.output_parameter_names ()
+");
     }
 .endfor
 
