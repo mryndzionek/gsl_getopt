@@ -75,4 +75,10 @@ A short and long option enum parameter example
 A long only option enum parameter example
 </parameter>
 
+<parameter name="regex_long" type="string">
+<regex>^read:(hold|write):([0-9]+)(-([0-9]+))*$</regex>
+<default>read:hold:2-10</default>
+A long only regex option example with default value 
+</parameter>
+
 </parser>
