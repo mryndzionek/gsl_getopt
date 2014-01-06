@@ -499,7 +499,7 @@ does not match regex: $(string.trim (.?''):left)");
     return self;
 
     error:
-    opts_destroy(&self);
+    $(parser.name)_destroy(&self);
     fprintf(stderr, "Usage: \\n%s", help_msg);
     return NULL;
 }
