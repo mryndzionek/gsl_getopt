@@ -105,6 +105,9 @@ void
     $(parser.name)_destroy ($(parser.name)_t **self_p);
 
 void
+    $(parser.name)_print_usage ();
+
+void
     $(parser.name)_dump ($(parser.name)_t *self);
 
 .for parser.parameter
@@ -219,11 +222,11 @@ static char *$(name)_dflt = "$(string.trim (.?''):left,c)";
 .endfor
 
 .for parameter where type = "bool" & (defined (lname) | string.length (name) > 1)
-static int $(name)_flag;
+static int $(name)_flag = 0;
 .endfor
 
 const static char help_msg[] =
-                    "$(parser.name) - $(parser.title)\\n"
+                    "$(parser.title)\\n"
 .for parameter
 .   if defined (lname)
                     "   -$(name) | --$(lname) - $(string.trim (.?''):left)\
@@ -387,9 +390,7 @@ $(parser.name)_parse (int argc, char **argv)
 .       if type = "string" | type = "enum"
 $(name):\
 .       elsif type = "bool"
-.           if !defined (lname)
 $(name)\   
-.           endif
 .       endif
 .   endif
 .endfor
@@ -416,7 +417,7 @@ $(name)\
 
 .for parameter by name
 .   if string.length (name) = 1
-.       if type = "string" | type = "enum" | (type = "bool" & !defined (lname))
+.       if type = "string" | type = "enum" | type = "bool"
             case '$(name)':
 .           if type = "string"
                 self->$(name) = optarg;
@@ -442,7 +443,8 @@ $(name)\
     }
 
 .for parameter where type = "bool" & (defined (lname) | string.length (name) > 1)
-    self->$(name) = $(name)_flag;
+    if($(name)_flag)
+    	self->$(name) = $(name)_flag;
 .endfor
 .for parameter where type = "string"
 .   for default where item () = 1
@@ -518,6 +520,12 @@ $(parser.name)_destroy ($(parser.name)_t **self_p)
         free (self);
         *self_p = NULL;
     }
+}
+
+void
+$(parser.name)_print_usage ()
+{
+    fprintf(stdout, "Usage: \\n%s", help_msg);
 }
 
 void
