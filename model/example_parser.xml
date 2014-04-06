@@ -41,7 +41,7 @@ A short and long option example with default value
 A string type long only option example
 </parameter>
 
-<parameter name="r" lname="regex" type="string">
+<parameter name="r" lname="regex" type="string" selftest="read:write:2-7">
 <regex>^read:(hold|write):([0-9]+)(-([0-9]+))*$</regex>
 A short and long regex option example
 </parameter>

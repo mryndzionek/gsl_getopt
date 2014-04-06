@@ -658,6 +658,45 @@ int $(parser.name)_test (bool verbose)
 .       endif
 .       endfor
 
+.   elsif type = "string"
+.       COUNT += 2
+.       if string.length (name) > 1
+            "--$(name)", \
+.           if defined (parameter->default)
+ "$(parameter->default)", \
+.           else
+.               if defined (selftest)
+ "$(selftest)", \
+.               else
+ "test value", \
+.               endif
+.           endif            
+.       else
+            "-$(name)", \
+.           if defined (parameter->default)
+ "$(parameter->default)", \
+.           else
+.               if defined (selftest)
+ "$(selftest)", \
+.               else
+ "test value", \
+.               endif
+.           endif            
+.       endif
+.       if defined (lname)
+.           COUNT += 2
+ "--$(lname)", \
+.           if defined (parameter->default)
+ "$(parameter->default)", \
+.           else
+.               if defined (selftest)
+ "$(selftest)", \
+.               else
+ "test value", \
+.               endif
+.           endif            
+.       endif
+
 .   endif
 .endfor
     };
