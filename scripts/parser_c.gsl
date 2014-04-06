@@ -506,7 +506,6 @@ does not match regex: $(string.trim (.?''):left)");
 
     error:
     $(parser.name)_destroy(&self);
-    fprintf(stderr, "Usage: \\n%s", help_msg);
     return NULL;
 }
 
@@ -630,5 +629,33 @@ $(parser.name)_$(lname) ($(parser.name)_t *self)
 
 int $(parser.name)_test (bool verbose)
 {
+    char *test_$(name)_str[] = {
+.define COUNT = 0
+.for parser.parameter
+.   if type = "bool"
+.       COUNT += 1
+.       if string.length (name) > 1
+            "--$(name)", \
+.       else
+            "-$(name)", \
+.       endif
+.       if defined (lname)
+.   COUNT += 1
+ "--$(lname)", \
+.       endif
 
+.   endif
+.endfor
+    };
+    int argc = $(COUNT);
+
+    opts_t *op = $(parser.name)_parse(argc, test_$(name)_str);
+    if(op != NULL)
+    {
+        opts_dump(op);
+        opts_destroy(&op);
+        return true;
+    }
+    else
+        return false;
 }
