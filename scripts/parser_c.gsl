@@ -640,9 +640,23 @@ int $(parser.name)_test (bool verbose)
             "-$(name)", \
 .       endif
 .       if defined (lname)
-.   COUNT += 1
+.           COUNT += 1
  "--$(lname)", \
 .       endif
+
+.   elsif type = "enum"
+.       for value
+.       COUNT += 2
+.       if string.length (name) > 1
+            "--$(name)", "$(string.trim (.?''):c)",\
+.       else
+            "-$(name)", "$(string.trim (.?''):c)",\
+.       endif
+.       if defined (lname)
+.           COUNT += 2
+ "--$(lname)", "$(string.trim (.?''):c)",\
+.       endif
+.       endfor
 
 .   endif
 .endfor
@@ -652,7 +666,8 @@ int $(parser.name)_test (bool verbose)
     opts_t *op = $(parser.name)_parse(argc, test_$(name)_str);
     if(op != NULL)
     {
-        opts_dump(op);
+        if(verbose)
+            opts_dump(op);
         opts_destroy(&op);
         return true;
     }
