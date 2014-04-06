@@ -3,6 +3,9 @@
 
 main(int argc, char **argv)
 {
+    int rc;
+
+    rc = opts_test(true);
     opts_t *op = opts_parse(argc, argv);
     if(op != NULL)
     {

@@ -51,6 +51,8 @@
 #ifndef __$(PARSER.NAME)_H_INCLUDED__
 #define __$(PARSER.NAME)_H_INCLUDED__
 
+#include <stdbool.h>
+
 /*  These are the $(parser.name) parameters
 .for parameter
 .   for parser.parameter as darg where parameter <> darg
@@ -131,6 +133,8 @@ int
 .   endif
 
 .endfor
+
+int $(parser.name)_test (bool verbose);
 
 #ifdef __cplusplus
 }
@@ -620,3 +624,11 @@ $(parser.name)_$(lname) ($(parser.name)_t *self)
 }
 
 .endfor
+
+//  --------------------------------------------------------------------------
+//  Selftest
+
+int $(parser.name)_test (bool verbose)
+{
+
+}
